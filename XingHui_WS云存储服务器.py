@@ -101,7 +101,7 @@ except Exception as e:
     print(f"初始化文件失败!{e}")
 
 日志数据 = []
-日志允许占用内存大小MB = 0.004
+日志允许占用内存大小MB = 2
 class rizhi():
     def info(字符串): # 普通日志处理
         global 日志数据
@@ -168,6 +168,12 @@ def 获取目录大小(路径):
         # rizhi.warning(f"[目录占用计算函数]发生了错误但为了保证运行正常忽略|ERROR:'{e}'")
         return 0
 
+性能 = {
+    "cpu":0,
+    "ram":0,
+    "disk":0,
+    "disk_fs":0
+}
 def 实时更新性能数据():
     global 性能
     while True:
@@ -181,6 +187,11 @@ def 实时更新性能数据():
             "disk":性能_磁盘空间占用,
             "disk_fs":性能_磁盘可用空间
         }
+    
+def 过渡(目前值, 目标值, 过渡参数, adt):
+    结果 = 目前值 + ( (目标值 - 目前值) / 过渡参数) * adt * 60
+    return 结果
+
 class Permission_error(Exception):
     pass
 class Operation_exception(Exception):
@@ -426,9 +437,31 @@ if GUI:
     window = pyglet.window.Window(1020, 720, "XingHui_WS信息面板", resizable=True)
     window.set_minimum_size(1020, 160) # 设置窗口最小宽高
     window.set_maximum_size(1020, 1080) # 设置窗口最大宽高
+    batch = pyglet.graphics.Batch()
+    # 创建日志布局
+    日志文档 = pyglet.text.document.UnformattedDocument("")
+    日志文档.set_style(0, 0, {'font_size': 9})
+    日志布局 = pyglet.text.layout.ScrollableTextLayout(
+        日志文档,
+        width=window.width//2 - 6,  # 留点边距
+        height=window.height - 6,
+        x=3,
+        y=3,
+        batch=batch,
+        multiline=True
+    )
+    日志布局.color = (0, 0, 0, 255)  # 黑色文字
+
+    def 更新日志显示():
+        最新日志 = 日志数据[-50:][::-1]  # 反转显示
+        显示文本 = "\n".join([日志[:140] for 日志 in 最新日志])
+        日志文档.text = 显示文本
+
     @window.event
     def on_draw():
+        global 性能
         window.clear()
+        更新日志显示()
         pyglet.shapes.Rectangle( # 背景_日志区域
             x=0,
             y=0,
@@ -436,36 +469,6 @@ if GUI:
             height=window.height,
             color=(255, 255, 255)
             ).draw()
-        i = 0
-        for 日志 in 日志数据[::-1]:
-            if len(日志) > 70:
-                输出日志 = 日志[70:140]
-                pyglet.text.Label( # 显示服务器日志
-                    输出日志,
-                    x=3,
-                    y=15 * i + 3,
-                    color=(0, 0, 0),
-                    font_size=9
-                    ).draw()
-                i += 1
-                输出日志 = 日志[:70]
-                pyglet.text.Label( # 显示服务器日志
-                    输出日志,
-                    x=3,
-                    y=15 * i + 3,
-                    color=(0, 0, 0),
-                    font_size=9
-                    ).draw()
-            else:
-                输出日志 = 日志
-                pyglet.text.Label( # 显示服务器日志
-                    输出日志,
-                    x=3,
-                    y=15 * i + 3,
-                    color=(0, 0, 0),
-                    font_size=9
-                    ).draw()
-            i += 1
         
         pyglet.shapes.Rectangle( # 背景_客户端区域
             x=window.width//2,
@@ -477,7 +480,7 @@ if GUI:
         pyglet.text.Label( # 显示客户端的标签
             f"客户端'ALL'({len(Client["all"])})",
             x=window.width//2,
-            y=window.height - 20,
+            y=window.height - 15,
             color=(255, 255, 255)
             ).draw()
         i = 0
@@ -508,7 +511,7 @@ if GUI:
         pyglet.shapes.Rectangle( # 条
             x=window.width//2 + 6,
             y=6,
-            width=5 * 性能["ram"] - 2,
+            width=max(0, 5 * 过渡性能["ram"] - 2),
             height=20 - 2,
             color=(148, 119, 5)
             ).draw()
@@ -530,7 +533,7 @@ if GUI:
         pyglet.shapes.Rectangle( # 条
             x=window.width//2 + 6,
             y=6 + 25,
-            width=5 * 性能["disk"] - 2,
+            width=max(0, 5 * 过渡性能["disk"] - 2),
             height=20 - 2,
             color=(16, 40, 138)
             ).draw()
@@ -552,7 +555,7 @@ if GUI:
         pyglet.shapes.Rectangle( # 条
             x=window.width//2 + 6,
             y=6 + 50,
-            width=5 * 性能["cpu"] - 2,
+            width=max(0, 5 * 过渡性能["cpu"] - 2),
             height=20 - 2,
             color=(208, 32, 144)
             ).draw()
@@ -562,5 +565,19 @@ if GUI:
             y=1 + 5 + 50,
             color=(255, 255, 255)
             ).draw()
+
+        batch.draw()
         pyglet.clock.tick()
+    
+    过渡性能 = {
+        "cpu":0,
+        "ram":0,
+        "disk":0,
+        "disk_fs":0
+    }
+    def 过渡性能数据(dt):
+        global 性能,过渡性能数据
+        for key in 性能:
+            过渡性能[key] = 过渡(过渡性能[key], 性能[key], 15, dt)
+    pyglet.clock.schedule_interval(过渡性能数据, 1/60.0)
     pyglet.app.run()
